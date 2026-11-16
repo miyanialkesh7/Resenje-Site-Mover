@@ -50,4 +50,4 @@
 ## 2026-11-16 — submitted to WordPress.org
 - Popup committed to SVN by Stefan (r3805211) → submission slot free. Site Mover 1.1.0 zip (same as GitHub release) submitted; Stefan ticked the 8 attestations.
 - Status: Awaiting Review. Initial slug resenje-site-mover-backup-migration (from the full display name) → automated scan reports
-  TextDomainMismatch everywhere. Slug can be changed ONCE before the review starts: proposed resenje-site-mover (matches text domain / main file) — waiting for Stefan.
+  TextDomainMismatch everywhere. Slug changed (once, on Stefan's ok) to resenje-site-mover → scan mismatches gone; status Awaiting Review.
