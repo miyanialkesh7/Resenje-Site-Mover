@@ -46,3 +46,8 @@
 - Not tested on real AWS / B2 / R2 (no account; S3 only against rustfs + versitygw).
 - CT 270 apache in container a was changed for tests (Listen 8093, ftp ext, max_execution_time=8) — gone on recreate.
 - Test stack on CT 270: `cd /opt/rsm && docker compose down -v` when no longer needed.
+
+## 2026-11-16 — submitted to WordPress.org
+- Popup committed to SVN by Stefan (r3805211) → submission slot free. Site Mover 1.1.0 zip (same as GitHub release) submitted; Stefan ticked the 8 attestations.
+- Status: Awaiting Review. Initial slug resenje-site-mover-backup-migration (from the full display name) → automated scan reports
+  TextDomainMismatch everywhere. Slug can be changed ONCE before the review starts: proposed resenje-site-mover (matches text domain / main file) — waiting for Stefan.
