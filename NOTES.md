@@ -51,3 +51,5 @@
 - Popup committed to SVN by Stefan (r3805211) → submission slot free. Site Mover 1.1.0 zip (same as GitHub release) submitted; Stefan ticked the 8 attestations.
 - Status: Awaiting Review. Initial slug resenje-site-mover-backup-migration (from the full display name) → automated scan reports
   TextDomainMismatch everywhere. Slug changed (once, on Stefan's ok) to resenje-site-mover → scan mismatches gone; status Awaiting Review.
+- 2026-11-17: WordPress.org icon/banner ready (variant "Ocean", Stefan's choice): C:\Users\Mili\Ai\resenje-brand\png\mover-a-ocean-* (+ svg/).
+  Add to SVN /assets after approval (icon-128x128, icon-256x256, banner-772x250, banner-1544x500, icon.svg).
