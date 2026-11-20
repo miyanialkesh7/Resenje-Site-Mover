@@ -13,8 +13,8 @@ No premium version, no size limits — kept alive by donations ☕.
 - Safe import: data goes into temporary tables first and replaces the live tables only at the very end
 - Optional: leave out the media library
 - **Scheduled backups** (hourly / daily / weekly / monthly) with retention on the server and on remote storage, e-mail on failure
-- **Remote storage:** SFTP / SSH (password or private key, host key pinning), Amazon S3 and S3-compatible (Backblaze B2, Wasabi, Cloudflare R2, MinIO, DigitalOcean Spaces …), FTP / FTPS — resumable uploads with retries, credentials stored encrypted
-- Backups in a protected folder with a random name (`.htaccess`, `web.config`, `index.php`); download / restore / delete from the list
+- **Remote storage:** SFTP / SSH (password or private key, host key pinning), Amazon S3 and S3-compatible (Backblaze B2, Wasabi, Cloudflare R2, MinIO, DigitalOcean Spaces …), FTP / FTPS (PHP ftp extension) — resumable uploads with retries, credentials stored encrypted
+- Backups in a protected folder with a random name inside `uploads` (`.htaccess`, `web.config`, `index.php`); download / restore / delete from the list
 - WP-CLI: `wp site-mover export [--exclude-media]`, `wp site-mover import <file> [--yes]`, `wp site-mover list`, `wp site-mover scheduled-backup`, `wp site-mover test-remote`
 - No external services, no tracking, no account
 

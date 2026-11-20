@@ -53,3 +53,13 @@
   TextDomainMismatch everywhere. Slug changed (once, on Stefan's ok) to resenje-site-mover → scan mismatches gone; status Awaiting Review.
 - 2026-11-17: WordPress.org icon/banner ready (variant "Ocean", Stefan's choice): C:\Users\Mili\Ai\resenje-brand\png\mover-a-ocean-* (+ svg/).
   Add to SVN /assets after approval (icon-128x128, icon-256x256, banner-772x250, banner-1544x500, icon.svg).
+
+## 2026-11-20 — WordPress.org review round 1 (F1 ...20Nov26) → 1.1.1
+- Issues: (1) WP_CONTENT_DIR/ABSPATH usage, write files in uploads; (2) cURL in own code (FTP); (3) import forced this plugin into active_plugins.
+- Fixes: backups now in uploads/rsmover-backups-<random> (old wp-content folder moved automatically on first use); content dir = dirname(get_theme_root())
+  (filter rsmover_content_dir), home path via get_home_path(); backup folders skipped at any level in export/import; FTP back on the PHP ftp
+  extension (ftp_fput at 0, ftp_append to continue — pure-ftpd ignores REST+STOR; FTPS with TLS session reuse fails with a clear message → use
+  SFTP/S3); active_plugins no longer touched (comes from the backup). ABSPATH only for core includes.
+- Tests (CT 270, WP_DEBUG on): old backups moved, export has 0 backup-dir entries, A→B import (prefix change, active plugins as on A, .htaccess
+  rebuilt, sample page 200), plain FTP md5 + retention + tiny steps, SFTP + S3 scheduled backups, activation + both admin pages render,
+  debug.log empty. PHP 7.4 lint, PHPCS clean (phpcbf), Plugin Check no errors.

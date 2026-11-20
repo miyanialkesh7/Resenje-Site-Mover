@@ -53,7 +53,7 @@ class RSMover_Import {
 			/* translators: %s: WordPress version of the backup */
 			throw new RuntimeException( esc_html( sprintf( __( 'This backup comes from WordPress %s. Update WordPress on this site to at least that version first.', 'resenje-site-mover' ), $manifest['wp_version'] ) ) );
 		}
-		$free = function_exists( 'disk_free_space' ) ? @disk_free_space( WP_CONTENT_DIR ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- may be disabled by the host.
+		$free = function_exists( 'disk_free_space' ) ? @disk_free_space( RSMover_Storage::content_dir() ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- may be disabled by the host.
 		if ( false !== $free && $free < filesize( $archive ) * 1.2 ) {
 			throw new RuntimeException( esc_html__( 'Not enough free disk space for this import.', 'resenje-site-mover' ) );
 		}
@@ -88,8 +88,8 @@ class RSMover_Import {
 			untrailingslashit( (string) $manifest['home_url'] ) => untrailingslashit( home_url() ),
 			untrailingslashit( (string) $manifest['site_url'] ) => untrailingslashit( site_url() ),
 			untrailingslashit( (string) $manifest['content_url'] ) => untrailingslashit( content_url() ),
-			(string) $manifest['content_dir'] => wp_normalize_path( WP_CONTENT_DIR ),
-			(string) $manifest['abspath']     => wp_normalize_path( untrailingslashit( ABSPATH ) ),
+			(string) $manifest['content_dir'] => RSMover_Storage::content_dir(),
+			(string) $manifest['abspath']     => RSMover_Storage::home_path(),
 		);
 		$pairs = array();
 		foreach ( $map as $from => $to ) {
@@ -176,8 +176,10 @@ class RSMover_Import {
 				return false;
 			}
 		}
-		if ( RSMover_Storage::is_backup_dir_name( $parts[0] ) ) {
-			return false;
+		foreach ( $parts as $part ) {
+			if ( RSMover_Storage::is_backup_dir_name( $part ) ) {
+				return false;
+			}
 		}
 		// Keep the running copy of this plugin; it is not replaced from the archive.
 		$own = 'plugins/' . dirname( RSMOVER_BASENAME ) . '/';
@@ -216,7 +218,7 @@ class RSMover_Import {
 				} elseif ( 0 === strpos( $entry['path'], RSMover_Export::CONTENT ) ) {
 					$rel = self::safe_content_path( substr( $entry['path'], strlen( RSMover_Export::CONTENT ) ) );
 					if ( false !== $rel ) {
-						$target = WP_CONTENT_DIR . '/' . $rel;
+						$target = RSMover_Storage::content_dir() . '/' . $rel;
 					}
 					++$job['files'];
 				}
@@ -494,12 +496,8 @@ class RSMover_Import {
 		}
 
 		wp_cache_flush();
-		// Keep this plugin active and let WordPress rebuild the rewrite rules for the new address.
-		$active = (array) get_option( 'active_plugins', array() );
-		if ( ! in_array( RSMOVER_BASENAME, $active, true ) ) {
-			$active[] = RSMOVER_BASENAME;
-			update_option( 'active_plugins', array_values( $active ) );
-		}
+		// The active plugins come unchanged from the backup (this plugin was active on the source site).
+		// Let WordPress rebuild the rewrite rules for the new address.
 		delete_option( 'rewrite_rules' );
 		// Rules and .htaccess are rebuilt on the next request, when the imported settings are loaded.
 		update_option( 'rsmover_flush_rewrite', 1, true );

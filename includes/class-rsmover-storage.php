@@ -27,10 +27,38 @@ class RSMover_Storage {
 	private static $dir = null;
 
 	/**
-	 * Returns (and creates) the protected backup directory inside wp-content.
+	 * The wp-content directory (parent of the themes directory), without a trailing slash.
+	 *
+	 * @return string
+	 */
+	public static function content_dir() {
+		$dir = untrailingslashit( wp_normalize_path( dirname( get_theme_root() ) ) );
+		/**
+		 * Filters the content directory that is backed up and restored.
+		 *
+		 * @param string $dir Absolute path without a trailing slash.
+		 */
+		return untrailingslashit( wp_normalize_path( (string) apply_filters( 'rsmover_content_dir', $dir ) ) );
+	}
+
+	/**
+	 * The WordPress home path (where wp-config.php usually lives), without a trailing slash.
+	 *
+	 * @return string
+	 */
+	public static function home_path() {
+		if ( ! function_exists( 'get_home_path' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		return untrailingslashit( wp_normalize_path( get_home_path() ) );
+	}
+
+	/**
+	 * Returns (and creates) the protected backup directory inside the uploads directory.
 	 *
 	 * The name has a random suffix so the files cannot be guessed on servers that ignore .htaccess.
-	 * It is found again by pattern, so it survives a database import.
+	 * It is found again by pattern, so it survives a database import. Backups of version 1.1.0 and
+	 * older (stored directly in wp-content) are moved here once.
 	 *
 	 * @return string
 	 */
@@ -38,12 +66,20 @@ class RSMover_Storage {
 		if ( null !== self::$dir ) {
 			return self::$dir;
 		}
-		$found = glob( WP_CONTENT_DIR . '/' . self::DIR_PREFIX . '*', GLOB_ONLYDIR );
+		$uploads = wp_upload_dir( null, false );
+		$base    = untrailingslashit( wp_normalize_path( $uploads['basedir'] ) );
+		$found   = glob( $base . '/' . self::DIR_PREFIX . '*', GLOB_ONLYDIR );
 		if ( ! empty( $found ) ) {
 			self::$dir = $found[0];
 		} else {
-			self::$dir = WP_CONTENT_DIR . '/' . self::DIR_PREFIX . strtolower( wp_generate_password( 20, false ) );
-			wp_mkdir_p( self::$dir );
+			$old = glob( self::content_dir() . '/' . self::DIR_PREFIX . '*', GLOB_ONLYDIR );
+			wp_mkdir_p( $base );
+			if ( ! empty( $old ) && @rename( $old[0], $base . '/' . basename( $old[0] ) ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- falls back to a new folder.
+				self::$dir = $base . '/' . basename( $old[0] );
+			} else {
+				self::$dir = $base . '/' . self::DIR_PREFIX . strtolower( wp_generate_password( 20, false ) );
+				wp_mkdir_p( self::$dir );
+			}
 		}
 		self::protect( self::$dir );
 		return self::$dir;
@@ -69,9 +105,9 @@ class RSMover_Storage {
 	}
 
 	/**
-	 * Whether a wp-content relative top-level name is a backup directory of this plugin.
+	 * Whether a directory name is a backup directory of this plugin (at any level of wp-content).
 	 *
-	 * @param string $name Top-level directory name.
+	 * @param string $name Directory name.
 	 * @return bool
 	 */
 	public static function is_backup_dir_name( $name ) {

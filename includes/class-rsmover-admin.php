@@ -796,7 +796,6 @@ class RSMover_Admin {
 									$c,
 									__( 'Options', 'resenje-site-mover' ),
 									self::checkbox( 'ftp][tls', $s['ftp']['tls'], __( 'Use TLS (FTPS) – strongly recommended, plain FTP sends the password unencrypted', 'resenje-site-mover' ) ) . '<br>'
-									. self::checkbox( 'ftp][verify', $s['ftp']['verify'], __( 'Verify the TLS certificate (turn on if the server has a valid certificate for this address)', 'resenje-site-mover' ) ) . '<br>'
 									. self::checkbox( 'ftp][passive', $s['ftp']['passive'], __( 'Passive mode', 'resenje-site-mover' ) )
 								);
 								?>

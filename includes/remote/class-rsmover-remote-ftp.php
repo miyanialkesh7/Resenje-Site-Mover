@@ -1,9 +1,6 @@
 <?php
 /**
- * FTP / FTPS destination.
- *
- * Uses the PHP cURL extension: the WordPress HTTP API has no FTP support, and the PHP ftp extension
- * fails on many FTPS servers (TLS 1.3 session reuse) and is missing on many hosts.
+ * FTP / FTPS destination (PHP ftp extension).
  *
  * @package ResenjeSiteMover
  */
@@ -12,7 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// phpcs:disable WordPress.WP.AlternativeFunctions -- FTP transfers need cURL directly (no FTP in the WordPress HTTP API).
+// Parts are sent from a php://temp stream with ftp_fput(); WP_Filesystem has no resumable upload.
+// phpcs:disable WordPress.WP.AlternativeFunctions
 
 /**
  * FTP destination.
@@ -22,148 +20,121 @@ class RSMover_Remote_FTP extends RSMover_Remote {
 	const PART = 16777216;
 
 	/**
-	 * The cURL handle, reused so the control connection (and TLS session) stays open between operations.
+	 * Open connection.
 	 *
-	 * @var resource|CurlHandle|null
+	 * @var resource|\FTP\Connection|null
 	 */
-	private $ch = null;
+	private $conn = null;
 
 	/**
-	 * URL of a file in the backup folder, or of the folder itself (ends with a slash).
+	 * Connects and logs in.
 	 *
-	 * @param string $file File name ('' for the folder).
-	 * @return string
-	 * @throws RuntimeException When the settings are incomplete.
+	 * @return resource|\FTP\Connection
+	 * @throws RuntimeException On failure.
 	 */
-	private function url( $file = '' ) {
+	private function connect() {
+		if ( $this->conn ) {
+			return $this->conn;
+		}
+		if ( ! function_exists( 'ftp_connect' ) ) {
+			throw new RuntimeException( esc_html__( 'FTP: the PHP ftp extension is not installed on this server. Use SFTP or S3 instead.', 'resenje-site-mover' ) );
+		}
 		$host = isset( $this->cfg['host'] ) ? trim( (string) $this->cfg['host'] ) : '';
+		$port = ! empty( $this->cfg['port'] ) ? (int) $this->cfg['port'] : 21;
+		$tls  = ! empty( $this->cfg['tls'] );
 		if ( '' === $host ) {
 			throw new RuntimeException( esc_html__( 'FTP: server address is missing.', 'resenje-site-mover' ) );
 		}
-		$port     = ! empty( $this->cfg['port'] ) ? (int) $this->cfg['port'] : 21;
-		$dir      = $this->dir();
-		$segments = array();
-		if ( '.' !== $dir ) {
-			foreach ( explode( '/', trim( $dir, '/' ) ) as $segment ) {
-				if ( '' !== $segment ) {
-					$segments[] = rawurlencode( $segment );
-				}
-			}
+		if ( $tls && ! function_exists( 'ftp_ssl_connect' ) ) {
+			throw new RuntimeException( esc_html__( 'FTP: this PHP build has no FTPS (TLS) support. Use SFTP or S3 instead.', 'resenje-site-mover' ) );
 		}
-		// A leading %2F makes the path absolute instead of relative to the login folder.
-		$path = 0 === strpos( $dir, '/' ) ? '/%2F' : '';
-		foreach ( $segments as $segment ) {
-			$path .= '/' . $segment;
+		$conn = $tls ? @ftp_ssl_connect( $host, $port, 20 ) : @ftp_connect( $host, $port, 20 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- failure is reported below.
+		if ( ! $conn ) {
+			throw new RuntimeException( esc_html__( 'FTP: cannot connect to the server.', 'resenje-site-mover' ) );
 		}
-		return 'ftp://' . $host . ':' . $port . $path . '/' . rawurlencode( $file );
+		$user = isset( $this->cfg['user'] ) ? (string) $this->cfg['user'] : '';
+		$pass = isset( $this->cfg['password'] ) ? (string) $this->cfg['password'] : '';
+		if ( ! @ftp_login( $conn, $user, $pass ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- failure is reported below.
+			ftp_close( $conn );
+			throw new RuntimeException( esc_html__( 'FTP: login failed. Check the user name and password.', 'resenje-site-mover' ) );
+		}
+		ftp_pasv( $conn, ! isset( $this->cfg['passive'] ) || ! empty( $this->cfg['passive'] ) );
+		$this->conn = $conn;
+		return $conn;
 	}
 
 	/**
-	 * Runs one cURL FTP operation.
-	 *
-	 * @param string $url  URL.
-	 * @param array  $opts Extra cURL options.
-	 * @return array body, info.
-	 * @throws RuntimeException On failure.
+	 * Closes the connection.
 	 */
-	private function curl( $url, array $opts ) {
-		if ( ! function_exists( 'curl_init' ) ) {
-			throw new RuntimeException( esc_html__( 'FTP: the PHP cURL extension is not installed on this server. Use SFTP or S3 instead.', 'resenje-site-mover' ) );
-		}
-		if ( ! $this->ch ) {
-			$this->ch = curl_init();
-		} else {
-			curl_reset( $this->ch );
-		}
-		$ch   = $this->ch;
-		$base = array(
-			CURLOPT_URL                     => $url,
-			CURLOPT_USERPWD                 => ( isset( $this->cfg['user'] ) ? (string) $this->cfg['user'] : '' ) . ':' . ( isset( $this->cfg['password'] ) ? (string) $this->cfg['password'] : '' ),
-			CURLOPT_RETURNTRANSFER          => true,
-			CURLOPT_CONNECTTIMEOUT          => 20,
-			CURLOPT_TIMEOUT                 => 300,
-			CURLOPT_FTP_CREATE_MISSING_DIRS => 1,
-		);
-		if ( ! empty( $this->cfg['tls'] ) ) {
-			$base[ CURLOPT_USE_SSL ]        = CURLUSESSL_ALL;
-			$base[ CURLOPT_SSL_VERIFYPEER ] = ! empty( $this->cfg['verify'] );
-			$base[ CURLOPT_SSL_VERIFYHOST ] = empty( $this->cfg['verify'] ) ? 0 : 2;
-		}
-		if ( isset( $this->cfg['passive'] ) && empty( $this->cfg['passive'] ) ) {
-			$base[ CURLOPT_FTPPORT ] = '-';
-		}
-		curl_setopt_array( $ch, $opts + $base );
-		$body  = curl_exec( $ch );
-		$errno = curl_errno( $ch );
-		$error = curl_error( $ch );
-		$info  = curl_getinfo( $ch );
-		if ( $errno ) {
-			if ( 67 === $errno ) {
-				throw new RuntimeException( esc_html__( 'FTP: login failed. Check the user name and password.', 'resenje-site-mover' ) );
-			}
-			/* translators: %s: error message */
-			throw new RuntimeException( esc_html( sprintf( __( 'FTP: %s', 'resenje-site-mover' ), $error ) ) );
-		}
-		return array(
-			'body' => (string) $body,
-			'info' => $info,
-		);
-	}
-
-	/**
-	 * Uploads data from memory.
-	 *
-	 * @param string $file   File name.
-	 * @param string $data   Data.
-	 * @param bool   $append Append instead of overwrite.
-	 */
-	private function put( $file, $data, $append ) {
-		$mem = fopen( 'php://temp', 'w+b' );
-		fwrite( $mem, $data );
-		rewind( $mem );
-		try {
-			$this->curl(
-				$this->url( $file ),
-				array(
-					CURLOPT_UPLOAD     => true,
-					CURLOPT_INFILE     => $mem,
-					CURLOPT_INFILESIZE => strlen( $data ),
-					CURLOPT_APPEND     => (bool) $append,
-				)
-			);
-		} finally {
-			fclose( $mem );
+	public function __destruct() {
+		if ( $this->conn ) {
+			@ftp_close( $this->conn ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- best effort.
 		}
 	}
 
 	/**
-	 * Sends FTP commands in the backup folder.
-	 *
-	 * @param string[] $commands Commands (prefix "*" to ignore a failure).
-	 */
-	private function commands( array $commands ) {
-		$this->curl(
-			$this->url(),
-			array(
-				CURLOPT_NOBODY    => true,
-				CURLOPT_POSTQUOTE => array_values( $commands ),
-			)
-		);
-	}
-
-	/**
-	 * Size of a remote file.
+	 * Path of a file in the backup folder.
 	 *
 	 * @param string $file File name.
-	 * @return int -1 when it does not exist.
+	 * @return string
 	 */
-	private function size( $file ) {
-		try {
-			$answer = $this->curl( $this->url( $file ), array( CURLOPT_NOBODY => true ) );
-		} catch ( Throwable $e ) {
-			return -1;
+	private function path( $file ) {
+		$dir = $this->dir();
+		return '.' === $dir ? $file : $dir . '/' . $file;
+	}
+
+	/**
+	 * Creates the remote folder (and its parents) when needed.
+	 *
+	 * @param resource|\FTP\Connection $conn Connection.
+	 */
+	private function ensure_dir( $conn ) {
+		$dir = $this->dir();
+		if ( '.' === $dir ) {
+			return;
 		}
-		return isset( $answer['info']['download_content_length'] ) ? (int) $answer['info']['download_content_length'] : -1;
+		$path = 0 === strpos( $dir, '/' ) ? '' : '.';
+		foreach ( explode( '/', trim( $dir, '/' ) ) as $segment ) {
+			if ( '' === $segment ) {
+				continue;
+			}
+			$path .= '/' . $segment;
+			@ftp_mkdir( $conn, $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- the folder may exist already.
+		}
+	}
+
+	/**
+	 * Sends data from memory, starting at an offset of the remote file.
+	 *
+	 * @param resource|\FTP\Connection $conn   Connection.
+	 * @param string                   $remote Remote path.
+	 * @param string                   $data   Data.
+	 * @param int                      $offset Start position.
+	 * @throws RuntimeException On failure.
+	 */
+	private function put( $conn, $remote, $data, $offset ) {
+		if ( 0 === $offset ) {
+			$mem = fopen( 'php://temp', 'w+b' );
+			fwrite( $mem, $data );
+			rewind( $mem );
+			$ok = @ftp_fput( $conn, $remote, $mem, FTP_BINARY ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- failure is reported below.
+			fclose( $mem );
+		} else {
+			// Continue with APPE: many servers ignore REST before STOR. ftp_append() needs a local file.
+			if ( ! function_exists( 'wp_tempnam' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/file.php';
+			}
+			$tmp = wp_tempnam( 'rsmover-ftp' );
+			file_put_contents( $tmp, $data );
+			$ok = @ftp_append( $conn, $remote, $tmp, FTP_BINARY ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- failure is reported below.
+			wp_delete_file( $tmp );
+		}
+		if ( ! $ok ) {
+			$message = empty( $this->cfg['tls'] )
+				? __( 'FTP: writing the file failed (no permission, disk full, or try switching passive mode).', 'resenje-site-mover' )
+				: __( 'FTP: writing the file failed. Some FTPS servers refuse the PHP ftp extension (TLS session reuse); if the connection works but writing fails, use SFTP or S3 instead.', 'resenje-site-mover' );
+			throw new RuntimeException( esc_html( $message ) );
+		}
 	}
 
 	/**
@@ -172,9 +143,11 @@ class RSMover_Remote_FTP extends RSMover_Remote {
 	 * @throws RuntimeException On failure.
 	 */
 	public function test() {
-		$file = '.rsmover-test-' . strtolower( wp_generate_password( 8, false ) );
-		$this->put( $file, 'test', false );
-		$this->commands( array( '*DELE ' . $file ) );
+		$conn = $this->connect();
+		$this->ensure_dir( $conn );
+		$file = $this->path( '.rsmover-test-' . strtolower( wp_generate_password( 8, false ) ) );
+		$this->put( $conn, $file, 'test', 0 );
+		@ftp_delete( $conn, $file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- best effort.
 		return __( 'Connected and wrote a test file.', 'resenje-site-mover' );
 	}
 
@@ -190,28 +163,36 @@ class RSMover_Remote_FTP extends RSMover_Remote {
 	 * @throws RuntimeException On failure.
 	 */
 	public function upload( $local, $name, $offset, array &$state, $deadline ) {
+		$conn = $this->connect();
 		$size = (int) filesize( $local );
-		$part = $name . '.part';
-		if ( $offset > 0 ) {
+		$part = $this->path( $name . '.part' );
+		if ( 0 === $offset ) {
+			$this->ensure_dir( $conn );
+			@ftp_delete( $conn, $part ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- may not exist.
+		} else {
 			// The local file never changes, so whatever already arrived is correct: continue after it.
-			$remote = $this->size( $part );
-			$offset = ( $remote < 0 || $remote > $size ) ? 0 : $remote;
+			$remote = ftp_size( $conn, $part );
+			$offset = ( $remote < 0 || $remote > $size ) ? 0 : (int) $remote;
 		}
 		while ( $offset < $size ) {
 			$data = self::read_part( $local, $offset, self::PART );
 			if ( '' === $data ) {
 				throw new RuntimeException( 'Cannot read the backup file.' );
 			}
-			$this->put( $part, $data, $offset > 0 );
+			$this->put( $conn, $part, $data, $offset );
 			$offset += strlen( $data );
 			if ( $offset < $size && microtime( true ) > $deadline ) {
 				return $offset;
 			}
 		}
-		if ( $this->size( $part ) !== $size ) {
+		if ( ftp_size( $conn, $part ) !== $size ) {
 			throw new RuntimeException( esc_html__( 'FTP: the uploaded file has the wrong size.', 'resenje-site-mover' ) );
 		}
-		$this->commands( array( '*DELE ' . $name, 'RNFR ' . $part, 'RNTO ' . $name ) );
+		$final = $this->path( $name );
+		@ftp_delete( $conn, $final ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- may not exist.
+		if ( ! @ftp_rename( $conn, $part, $final ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- failure is reported below.
+			throw new RuntimeException( esc_html__( 'FTP: cannot rename the uploaded file.', 'resenje-site-mover' ) );
+		}
 		return $size;
 	}
 
@@ -223,20 +204,15 @@ class RSMover_Remote_FTP extends RSMover_Remote {
 	 * @return int
 	 */
 	public function prune( $prefix, $keep ) {
-		$answer = $this->curl( $this->url(), array( CURLOPT_DIRLISTONLY => true ) );
-		$names  = preg_split( '/\r?\n/', trim( $answer['body'] ) );
-		$delete = self::names_to_delete( is_array( $names ) ? $names : array(), $prefix, $keep );
-		if ( $delete ) {
-			$this->commands(
-				array_map(
-					function ( $name ) {
-						return '*DELE ' . $name;
-					},
-					$delete
-				)
-			);
+		$conn  = $this->connect();
+		$names = @ftp_nlist( $conn, $this->dir() ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an empty folder may return false.
+		$count = 0;
+		foreach ( self::names_to_delete( is_array( $names ) ? $names : array(), $prefix, $keep ) as $name ) {
+			if ( @ftp_delete( $conn, $this->path( $name ) ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- counted below.
+				++$count;
+			}
 		}
-		return count( $delete );
+		return $count;
 	}
 
 	/**
@@ -246,8 +222,11 @@ class RSMover_Remote_FTP extends RSMover_Remote {
 	 * @param array  $state Upload state.
 	 */
 	public function abort( $name, array $state ) {
+		if ( ! function_exists( 'ftp_delete' ) ) {
+			return;
+		}
 		try {
-			$this->commands( array( '*DELE ' . $name . '.part' ) );
+			@ftp_delete( $this->connect(), $this->path( $name . '.part' ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- best effort.
 		} catch ( Throwable $e ) {
 			unset( $e );
 		}

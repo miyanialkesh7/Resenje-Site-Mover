@@ -3,7 +3,7 @@
  * Plugin Name:       Resenje Site Mover – Backup & Migration
  * Plugin URI:        https://github.com/stefanzeljkic/Resenje-Site-Mover
  * Description:       Back up a complete WordPress site into one file and move it to another hosting or domain. Addresses are changed automatically, also inside serialized data. Free, no limits.
- * Version:           1.1.0
+ * Version:           1.1.1
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Stefan Zeljkic
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'RSMOVER_VERSION', '1.1.0' );
+define( 'RSMOVER_VERSION', '1.1.1' );
 define( 'RSMOVER_FILE', __FILE__ );
 define( 'RSMOVER_BASENAME', plugin_basename( __FILE__ ) );
 

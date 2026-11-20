@@ -5,7 +5,7 @@ Tags: backup, migration, scheduled backup, sftp, s3
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -63,7 +63,7 @@ Yes. Everything is included, without limits. If the plugin saved you time or a m
 
 = Where are the backups stored? =
 
-In `wp-content/rsmover-backups-<random>/`. The folder is protected against web access (.htaccess, web.config and a random name for servers that ignore those files). Download your backups and keep a copy somewhere else.
+In `wp-content/uploads/rsmover-backups-<random>/` (backups of older versions are moved there automatically). The folder is protected against web access (.htaccess, web.config and a random name for servers that ignore those files). Download your backups and keep a copy somewhere else.
 
 = My import was interrupted. Is my site broken? =
 
@@ -79,7 +79,7 @@ Site Mover → Scheduled backups: choose how often, where to copy the backups an
 
 = Which remote storage is supported? =
 
-SFTP / SSH servers (password or private key), Amazon S3 and every S3-compatible storage (Backblaze B2, Wasabi, Cloudflare R2, MinIO, DigitalOcean Spaces, Hetzner Object Storage …) and FTP / FTPS. Use “Test remote storage” after saving the settings.
+SFTP / SSH servers (password or private key), Amazon S3 and every S3-compatible storage (Backblaze B2, Wasabi, Cloudflare R2, MinIO, DigitalOcean Spaces, Hetzner Object Storage …) and FTP / FTPS (needs the PHP ftp extension; some FTPS servers do not accept it – then use SFTP or S3). Use “Test remote storage” after saving the settings.
 
 = Are my remote storage passwords safe? =
 
@@ -106,6 +106,12 @@ Its settings and the backup folder (with all backups in it) are removed. Downloa
 
 == Changelog ==
 
+= 1.1.1 =
+* Backups are stored in the uploads folder; existing backups are moved there automatically.
+* Folder locations are determined with WordPress functions.
+* FTP / FTPS uses the PHP ftp extension.
+* The import no longer changes the list of active plugins (it comes unchanged from the backup).
+
 = 1.1.0 =
 * New: scheduled backups (hourly, daily, weekly, monthly) with retention and e-mail notifications.
 * New: copy scheduled backups to SFTP / SSH, Amazon S3 / S3-compatible storage or FTP / FTPS; resumable uploads with retries.
@@ -117,6 +123,9 @@ Its settings and the backup folder (with all backups in it) are removed. Downloa
 * First release: backup, download, import / migration with URL and path replacement, chunked upload, WP-CLI commands.
 
 == Upgrade Notice ==
+
+= 1.1.1 =
+WordPress.org review changes: backups move to the uploads folder.
 
 = 1.1.0 =
 Scheduled backups to SFTP, S3 and FTP; fixes 404 errors after an import.

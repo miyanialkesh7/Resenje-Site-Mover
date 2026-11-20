@@ -84,7 +84,6 @@ class RSMover_Schedule {
 				'password' => '',
 				'path'     => '',
 				'tls'      => true,
-				'verify'   => false,
 				'passive'  => true,
 			),
 		);

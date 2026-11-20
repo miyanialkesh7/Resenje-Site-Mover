@@ -291,13 +291,17 @@ class RSMover_Export {
 		if ( $job['options']['exclude_media'] ) {
 			$excluded[] = 'uploads';
 		}
-		$root = wp_normalize_path( WP_CONTENT_DIR );
+		$root = RSMover_Storage::content_dir();
 		$len  = strlen( $root ) + 1;
 
 		$filter = function ( $current ) use ( $excluded, $len ) {
 			$rel = substr( wp_normalize_path( $current->getPathname() ), $len );
-			if ( false === strpos( $rel, '/' ) && $current->isDir() ) {
-				if ( in_array( $rel, $excluded, true ) || RSMover_Storage::is_backup_dir_name( $rel ) ) {
+			if ( $current->isDir() ) {
+				// Backup folders of this plugin are skipped at any level (they live in uploads since 1.1.1).
+				if ( RSMover_Storage::is_backup_dir_name( $current->getFilename() ) ) {
+					return false;
+				}
+				if ( false === strpos( $rel, '/' ) && in_array( $rel, $excluded, true ) ) {
 					return false;
 				}
 			}
@@ -309,7 +313,7 @@ class RSMover_Export {
 
 		$iterator = new RecursiveIteratorIterator(
 			new RecursiveCallbackFilterIterator(
-				new RecursiveDirectoryIterator( WP_CONTENT_DIR, FilesystemIterator::SKIP_DOTS ),
+				new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ),
 				$filter
 			),
 			RecursiveIteratorIterator::LEAVES_ONLY,
@@ -364,7 +368,7 @@ class RSMover_Export {
 					$src = RSMover_Storage::work_path( $job['db_file'] );
 					$rel = self::DATABASE;
 				} else {
-					$src = WP_CONTENT_DIR . '/' . $line;
+					$src = RSMover_Storage::content_dir() . '/' . $line;
 					$rel = self::CONTENT . $line;
 				}
 				clearstatcache( true, $src );
@@ -416,8 +420,8 @@ class RSMover_Export {
 			'created'        => gmdate( 'c' ),
 			'home_url'       => home_url(),
 			'site_url'       => site_url(),
-			'abspath'        => wp_normalize_path( untrailingslashit( ABSPATH ) ),
-			'content_dir'    => wp_normalize_path( WP_CONTENT_DIR ),
+			'abspath'        => RSMover_Storage::home_path(),
+			'content_dir'    => RSMover_Storage::content_dir(),
 			'content_url'    => content_url(),
 			'table_prefix'   => $wpdb->prefix,
 			'wp_version'     => get_bloginfo( 'version' ),
