@@ -63,3 +63,5 @@
 - Tests (CT 270, WP_DEBUG on): old backups moved, export has 0 backup-dir entries, A→B import (prefix change, active plugins as on A, .htaccess
   rebuilt, sample page 200), plain FTP md5 + retention + tiny steps, SFTP + S3 scheduled backups, activation + both admin pages render,
   debug.log empty. PHP 7.4 lint, PHPCS clean (phpcbf), Plugin Check no errors.
+- Done on Stefan's ok: 1.1.1 uploaded ("New version ... uploaded for review", no scan errors), reply sent from Outlook (stefan.zeljkic@resenje.rs,
+  2026-11-20 11:16), pushed + GitHub release 1.1.1. Waiting for the reviewer (deeper second review may raise more issues).
