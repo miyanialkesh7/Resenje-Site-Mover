@@ -39,6 +39,7 @@
   no link change needed in either plugin). Chrome extension blocks patreon.com, so Stefan did it himself.
 
 ## Open
+- **Outside PRs #1–#4 (miyanialkesh7 = Alkesh Miyani, Techeshta, opened 2026-11-20 14:04, no reply yet; found 2026-11-21 by the BackupZit session):** #1 14 error messages through esc_html__(); #2 hardening (CREATE TABLE from the archive with a `;` refused, import/export skip symlinked files, relative path in 'Cannot write', strict upload chunk checks); #3 tests/replacer-test.php WPCS + comments only; #4 .distignore. Not merged: double security review per the external-PR rule + Docker test in CT 270, then into the next version after the WP.org review (do not change the uploaded 1.1.1 unless the reviewer asks); thank him after the release. Stefan decides.
 - Stefan tests 1.1.0 on real hosting (SFTP/S3/FTP, schedules, 404 fix).
 - WordPress.org submission: only after the popup plugin's review is done (WP.org allows one pending submission per account).
 - Not tested yet: real shared hosting (nginx without .htaccess, low memory_limit), MySQL 8 → MariaDB collation path, very large sites (>2 GB, 32-bit PHP).
@@ -65,3 +66,9 @@
   debug.log empty. PHP 7.4 lint, PHPCS clean (phpcbf), Plugin Check no errors.
 - Done on Stefan's ok: 1.1.1 uploaded ("New version ... uploaded for review", no scan errors), reply sent from Outlook (stefan.zeljkic@resenje.rs,
   2026-11-20 11:16), pushed + GitHub release 1.1.1. Waiting for the reviewer (deeper second review may raise more issues).
+
+## 2026-11-23 — APPROVED and published on WordPress.org
+- Mail "APPROVED resenje-site-mover/stefanzeljkic/20Nov26/T2 23Nov26". SVN prepared in CT 270 /opt/wporg/rsm-svn (trunk + tags/1.1.1 from the
+  reviewed 1.1.1 zip, assets = Ocean icon/banner); Stefan committed with /opt/wporg/commit-rsm.sh → r3818185. Public:
+  https://wordpress.org/plugins/resenje-site-mover/ (API shows version 1.1.1).
+- Future releases: build zip → update /opt/wporg/rsm-svn/trunk, svn cp trunk tags/<ver>, bump Stable tag → Stefan commits (SVN password is his).
